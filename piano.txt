@@ -1,0 +1,56 @@
+# Piano sample notes
+# Linus Yang
+#
+# Classics
+# Arranged by Linus Yang
+#
+# 1. Edelweiss
+X=m-s^r--^d-sf--;#
+Y=m-sslt^d--^d--;#
+$Xm-mmfsl--s--
+$X$Y
+^r-[ss]tlsm-s^d--
+l-^d^r-^dt--s--
+$X$Y
+
+# 2. Fur Elise
+W=[^m^r][^m^r][^mt][^r^d]l-
+[dm][lt--];#
+$W[ml][t^d--]m
+$W[m^d][tl--]
+[t^d][^r^m--]
+[s^f][^m^r--]
+[f^m][^r^d--]
+[m^r][^dt--]
+[mm][^mm][^m^m]
+$W[m^d][tl--]
+
+# 3. Auld Lang Syne
+Z=mm-dr-dr-;#
+_sd-dd-mr-dr-md-dm-sl---
+ls-$Zmd-_(ll-s)d---
+ls-$Zls-mm-sl---
+^ds-$Zmd-_(ll-s)d---
+
+# Samples from exam sheet
+# Arranged by Prof. Francis Lau
+#
+# 1. Happy Birthday
+[ss]ls^dt-
+[ss]ls^r^d-
+[ss]^(smd)tl-
+^([ff]mdrd---)
+#
+# 2. We Wish you a Merry Christmas
+2{
+_sd[drd_t]_(ll)
+_lr[rmrd]_(ts)
+_sm[mfmr]d_l
+[_(ss)]_lr_td-}
+
+# 3. Ode to Joy
+A=mmfssfmrddrm; # semi-colon should be here
+$Amrr-
+$Ardd-
+rrmdr[mf]mdr[mf]mrdr_s-
+^($Ardd-)

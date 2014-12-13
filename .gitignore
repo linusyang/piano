@@ -1,0 +1,9 @@
+*.DS_Store
+*.swp
+*.c
+*.cc
+*.h
+*.mid
+*.output
+*.dSYM/
+piano

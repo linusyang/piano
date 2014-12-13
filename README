@@ -1,0 +1,15 @@
+Piano
+=====
+
+A funny note translator.
+
+Run `make' to translate sample notes.
+Translated notes can be played at http://virtualpiano.net/.
+
+Now it generates MIDI file!
+So no need to play by yourself. :)
+
+Oh, you may note that the grammar is buggy (has conflicts), 
+but at least it works :P
+
+-- Love from Linus
