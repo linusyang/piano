@@ -50,7 +50,7 @@ _sm[mfmr]d_l
 
 # 3. Ode to Joy
 A=mmfssfmrddrm; # semi-colon should be here
-$Amrr-
-$Ardd-
+$A[m--r]r-
+$A[r--d]d-
 rrmdr[mf]mdr[mf]mrdr_s-
-^($Ardd-)
+^($A[r--d]d-)
