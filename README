@@ -7,6 +7,9 @@ Run `make' to translate sample songs.
 Translated notes can be played at http://virtualpiano.net/.
 
 Now it generates MIDI file!
+Use embedded HTML5 player to play it:
+Open MIDIPlayer.html or visit https://linusyang.github.io/piano/.
+
 So no need to play by yourself :)
 
 -- Love from Linus
