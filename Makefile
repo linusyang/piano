@@ -3,12 +3,18 @@
 
 APP = piano
 
-CXX = g++
-CXXFLAGS = -O2 -g
-LDFLAGS = -lfl -L/opt/local/lib
-
 FLEX = flex
 BISON = bison
+CXX = g++
+CXXFLAGS = -O2 -g
+LDFLAGS =
+
+# Workaround for OS X
+ifneq ($(wildcard /usr/lib/libl.a),)
+	LDFLAGS += -ll
+else
+	LDFLAGS += -lfl
+endif
 
 all: run
 

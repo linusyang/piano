@@ -30,9 +30,9 @@
 using namespace std;
 
 extern "C" char *yytext;
-extern "C" int yylex(YYSTYPE *, YYLTYPE *);
+extern "C" int yylex();
 extern "C" FILE *yyin;
-void yyerror(YYLTYPE *, const char *);
+void yyerror(const char *);
 
 static char map_octave(char c);
 static string *append_note(string *s, const char *t);
@@ -83,10 +83,8 @@ const unsigned char midi_timeSigEvent[] = {
 
 %}
 
-%defines
 %locations
 %error-verbose
-%define api.pure full
 
 %union {
     int ival;
@@ -382,10 +380,10 @@ static void output_note(string *s)
     cout << *s;
 }
 
-void yyerror(YYLTYPE *t, const char *s)
+void yyerror(const char *s)
 {
     fprintf(stderr, "\n** line %d, col %d, token `%s': %s\n", 
-        t->first_line, t->first_column, yytext, s);
+        yylloc.first_line, yylloc.first_column, yytext, s);
     exit(-1);
 }
 
