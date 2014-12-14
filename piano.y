@@ -13,43 +13,50 @@
 #include <algorithm>
 #include <iterator>
 #include <utility>
+#include "piano.tab.h"
 
 #define VCOUNT 26
 #define OCOUNT 7
 #define GETV(c) (&vtable[(c) - 'A'])
 #define SETV(c, s) (vtable[(c) - 'A'] = *(s))
-#define CONCAT(s, t) (new string(*(s) + *(t)))
-#define CONCAT_ELE(s, t) (new string(*(s) + " " + *(t)))
-#define STR(s) (new string(s))
-#define STRC(c) (new string(1, c))
+#define CONCAT(s, t) (str_concat(s, t))
+#define CONCAT_ELE(s, t) (str_concat_ele(s, t))
+#define STR(s) (str_copy(s))
 #define PEMPTY (&empty)
+#define PNEWLINE (&newline)
 #define WRITE_BYTES(f, b) (fwrite(b, 1, sizeof(b), f))
 
 using namespace std;
 
 extern "C" char *yytext;
-extern "C" int yylex();
+extern "C" int yylex(YYSTYPE *, YYLTYPE *);
 extern "C" FILE *yyin;
+void yyerror(YYLTYPE *t, const char *s);
 
-int octave_index(char c);
-void yyerror(const char *s);
-string map_all(string &s, const char map[OCOUNT]);
-string append_all(string &s, const char *t);
-string remove_space(string &s);
+static string map_all(string &s, const char map[OCOUNT]);
+static string append_all(string &s, const char *t);
+static string remove_space(string &s);
 
-char orig_key(char c);
-string sharp_key(string &s);
-string flat_key(string &s);
-string sharp_all(string &s);
-string flat_all(string &s);
-void write_to_midi(string &s);
+static char orig_key(char c);
+static string sharp_key(string &s);
+static string flat_key(string &s);
+static string sharp_all(string &s);
+static string flat_all(string &s);
+static void write_to_midi(string &s);
 
-string vtable[VCOUNT];
-const char octaves[OCOUNT] = {'d', 'r', 'm', 'f', 's', 'l', 't'};
-const char map_flat[OCOUNT] = {'8', '9', '0', 'q', 'w', 'e', 'r'};
-const char map_normal[OCOUNT] = {'t', 'y', 'u', 'i', 'o', 'p', 'a'};
-const char map_sharp[OCOUNT] = {'s', 'd', 'f', 'g', 'h', 'j', 'k'};
-string empty = "";
+static vector<string *> str_pool;
+static string *str_copy(string s);
+static string *str_copy(char c);
+static string *str_concat(string *s, string *t);
+static string *str_concat_ele(string *s, string *t);
+
+static string vtable[VCOUNT];
+static const char octaves[OCOUNT] = {'d', 'r', 'm', 'f', 's', 'l', 't'};
+static const char map_flat[OCOUNT] = {'8', '9', '0', 'q', 'w', 'e', 'r'};
+static const char map_normal[OCOUNT] = {'t', 'y', 'u', 'i', 'o', 'p', 'a'};
+static const char map_sharp[OCOUNT] = {'s', 'd', 'f', 'g', 'h', 'j', 'k'};
+static string empty = "";
+static string newline = "\n";
 
 const int midi_note[OCOUNT] = {60, 62, 64, 65, 67, 69, 71};
 const unsigned char midi_header[] = {
@@ -62,7 +69,7 @@ const unsigned char midi_header[] = {
 const unsigned char midi_footer[] = { 0x01, 0xFF, 0x2F, 0x00 };
 const unsigned char midi_tempoEvent[] = {
     0x00, 0xFF, 0x51, 0x03,
-    0x0F, 0x42, 0x40 // Default 1 million usec per crotchet
+    0x0c, 0x35, 0x00 // 75 bpm
 };
 const unsigned char midi_keySigEvent[] = {
     0x00, 0xFF, 0x59, 0x02,
@@ -78,6 +85,11 @@ const unsigned char midi_timeSigEvent[] = {
 };
 
 %}
+
+%defines
+%locations
+%error-verbose
+%define api.pure full
 
 %union {
     int ival;
@@ -107,10 +119,8 @@ const unsigned char midi_timeSigEvent[] = {
 %token SEMICOLON
 %token NEWLINE
 
-%left FLAT
-%left SHARP
-%right TWOBEATS
-%right FOURBEATS
+%right TWOBEATS THREEBEATS FOURBEATS
+%left FLAT SHARP
 
 %type <sval> statments statment expression elements element
 
@@ -159,13 +169,13 @@ expression:
 
 elements:
     element { $$ = $1; }
-    | element elements { $$ = (*($1) == "\n") ? CONCAT($1, $2) : CONCAT_ELE($1, $2); }
+    | element elements { $$ = (*($1) == newline) ? CONCAT(PNEWLINE, $2) : CONCAT_ELE($1, $2); }
     ;
 
 element:
     REF VAR { $$ = GETV($2); }
-    | NEWLINE { $$ = STRC('\n'); }
-    | OCTAVE { $$ = STRC(orig_key($1)); }
+    | NEWLINE { $$ = PNEWLINE; }
+    | OCTAVE { $$ = STR(orig_key($1)); }
     | element TWOBEATS { $$ = STR(append_all(*($1), "-")); }
     | element THREEBEATS { $$ = STR(append_all(*($1), "--")); }
     | element FOURBEATS { $$ = STR(append_all(*($1), "---")); }
@@ -177,7 +187,7 @@ element:
 
 %%
 
-char orig_key(char c)
+static char orig_key(char c)
 {
     for (int i = 0; i < OCOUNT; i++) {
         if (octaves[i] == c) {
@@ -188,7 +198,7 @@ char orig_key(char c)
     return -1;
 }
 
-string change_key(string &s, bool flat)
+static string change_key(string &s, bool flat)
 {
     stringstream ss;
     for (int i = 0; i < s.length(); i++) {
@@ -209,17 +219,17 @@ string change_key(string &s, bool flat)
     return ss.str();
 }
 
-string sharp_key(string &s)
+static string sharp_key(string &s)
 {
     return change_key(s, false);
 }
 
-string flat_key(string &s)
+static string flat_key(string &s)
 {
     return change_key(s, true);
 }
 
-vector<string> split(string s)
+static vector<string> split(string s)
 {
     vector<string> tokens;
     istringstream iss(s);
@@ -227,7 +237,7 @@ vector<string> split(string s)
     return tokens;
 }
 
-string merge(vector<string> &v)
+static string merge(vector<string> &v)
 {
     stringstream ss;
     for (size_t i = 0; i < v.size(); ++i) {
@@ -239,7 +249,7 @@ string merge(vector<string> &v)
     return ss.str();
 }
 
-string sharp_all(string &s)
+static string sharp_all(string &s)
 {
     vector<string> input, output;
     input = split(s);
@@ -249,7 +259,7 @@ string sharp_all(string &s)
     return merge(output);
 }
 
-string flat_all(string &s)
+static string flat_all(string &s)
 {
     vector<string> input, output;
     input = split(s);
@@ -259,7 +269,7 @@ string flat_all(string &s)
     return merge(output);
 }
 
-string append_all(string &s, const char *t)
+static string append_all(string &s, const char *t)
 {
     vector<string> input, output;
     input = split(s);
@@ -269,19 +279,49 @@ string append_all(string &s, const char *t)
     return merge(output);
 }
 
-string remove_space(string &str)
+static string remove_space(string &str)
 {
     str.erase(remove(str.begin(), str.end(), ' '), str.end());
     return str;
 }
 
-void yyerror(const char *s)
+static string *str_copy(string s)
 {
-    cerr << "parse error: " << s << endl;
-    exit(-1);
+    string *t = new string(s);
+    str_pool.push_back(t);
+    return t;
 }
 
-int char_to_midi_note(char c)
+static string *str_copy(string *s)
+{
+    return str_copy(*s);
+}
+
+static string *str_copy(char c)
+{
+    return str_copy(string(1, c));
+}
+
+static string *str_concat(string *s, string *t)
+{
+    return str_copy(*s + *t);
+}
+
+static string *str_concat_ele(string *s, string *t)
+{
+    return str_copy(*s + " " + *t);
+}
+
+static void str_pool_clean()
+{
+    for (vector<string *>::iterator i = str_pool.begin(); i != str_pool.end(); i++) {
+        string *s = *i;
+        delete s;
+    }
+    str_pool.clear();
+}
+
+static int char_to_midi_note(char c)
 {
     for (int i = 0; i < OCOUNT; i++) {
         if (c == map_flat[i]) {
@@ -296,7 +336,7 @@ int char_to_midi_note(char c)
     return -1;
 }
 
-void write_to_midi(string &s)
+static void write_to_midi(string &s)
 {
     vector<pair<int, int> > seq;
     vector<string> p = split(s);
@@ -352,6 +392,13 @@ void write_to_midi(string &s)
     fclose(fout);
 }
 
+void yyerror(YYLTYPE *t, const char *s)
+{
+    fprintf(stderr, "\n** line %d, col %d, token `%s': %s\n", 
+        t->first_line, t->first_column, yytext, s);
+    exit(-1);
+}
+
 int main(int argc, const char *argv[])
 {
     const char *fname = "piano.txt";
@@ -365,12 +412,11 @@ int main(int argc, const char *argv[])
     }
 
     yyin = fin;
-    
     do {
         yyparse();
     } while (!feof(yyin));
-
     fclose(fin);
+    str_pool_clean();
 
     return 0;
 }

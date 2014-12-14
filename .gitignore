@@ -3,6 +3,7 @@
 *.c
 *.cc
 *.h
+*.o
 *.mid
 *.output
 *.dSYM/

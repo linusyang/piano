@@ -15,20 +15,21 @@ all: run
 run: $(APP)
 	./$(APP)
 
-$(APP): lex.yy.cc $(APP).tab.cc
+$(APP): $(APP).tab.o lex.yy.o
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-%.cc: %.c
-	mv $^ $@
+%.o: %.c
+	cp $< $<c
+	$(CXX) $(CXXFLAGS) $<c -c -o $@
 
 lex.yy.c: $(APP).l
-	$(FLEX) $^
+	$(FLEX) $<
 
 $(APP).tab.c: $(APP).y
-	$(BISON) -d -v $^
+	$(BISON) -d -v $<
 
 clean:
-	rm -f $(APP) lex.yy.c lex.yy.cc 
+	rm -f $(APP) *.o lex.yy.c lex.yy.cc 
 	rm -f $(APP).tab.c $(APP).tab.cc $(APP).tab.h $(APP).output
 	rm -f $(APP).mid
 	rm -Rf $(APP).dSYM
