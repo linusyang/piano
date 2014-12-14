@@ -37,9 +37,7 @@ comment              #.*\n
 
 "_"                  return(FLAT);
 "^"                  return(SHARP);
-"-"                  return(TWOBEATS);
-"--"                 return(THREEBEATS);
-"---"                return(FOURBEATS);
+"-"                  return(BEAT);
 "("                  return(LPAREN);
 ")"                  return(RPAREN);
 "["                  return(LBRACKET);

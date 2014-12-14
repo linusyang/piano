@@ -26,6 +26,8 @@
 #define PEMPTY (&empty)
 #define PNEWLINE (&newline)
 #define WRITE_BYTES(f, b) (fwrite(b, 1, sizeof(b), f))
+#define BEAT_CHAR '-'
+#define BEAT_STR "-"
 
 using namespace std;
 
@@ -98,9 +100,7 @@ const unsigned char midi_timeSigEvent[] = {
 
 %token FLAT
 %token SHARP
-%token TWOBEATS
-%token THREEBEATS
-%token FOURBEATS
+%token BEAT
 
 %token LPAREN
 %token RPAREN
@@ -114,7 +114,7 @@ const unsigned char midi_timeSigEvent[] = {
 %token SEMICOLON
 %token NEWLINE
 
-%right TWOBEATS THREEBEATS FOURBEATS
+%right BEAT
 %left FLAT SHARP
 
 %type <sval> notes note
@@ -149,9 +149,7 @@ note:
     REF VAR { $$ = GETV($2); }
     | NEWLINE { $$ = PNEWLINE; }
     | OCTAVE { $$ = STR(map_octave($1)); }
-    | note TWOBEATS { $$ = append_note($1, "-"); }
-    | note THREEBEATS { $$ = append_note($1, "--"); }
-    | note FOURBEATS { $$ = append_note($1, "---"); }
+    | note BEAT { $$ = append_note($1, BEAT_STR); }
     | SHARP note { $$ = sharp_note($2); }
     | FLAT note { $$ = flat_note($2); }
     | LPAREN notes RPAREN { $$ = $2; }
@@ -245,7 +243,7 @@ static string transform_note(string &s, bool flat)
     stringstream ss;
     for (int i = 0; i < s.length(); i++) {
         bool found = false;
-        if (s[i] != '-') {
+        if (s[i] != BEAT_CHAR) {
             for (int j = 0; j < OCOUNT; j++) {
                 if (map_normal[j] == s[i]) {
                     ss << (flat ? map_flat[j] : map_sharp[j]);
@@ -327,7 +325,7 @@ static void output_note(string *s)
     for (vector<string>::iterator i = p.begin(); i != p.end(); i++) {
         int length = 0;
         for (string::iterator j = i->begin(); j != i->end(); j++) {
-            if (*j != '-') {
+            if (*j != BEAT_CHAR) {
                 length++;
             }
         }
@@ -338,11 +336,11 @@ static void output_note(string *s)
         beat /= length;
         for (string::iterator j = i->begin(); j != i->end(); j++) {
             int tone = 0;
-            if (*j != '-') {
+            if (*j != BEAT_CHAR) {
                 tone = char_to_midi_note(*j);
                 int dash = 0;
                 j++;
-                while (j != i->end() && *j == '-') {
+                while (j != i->end() && *j == BEAT_CHAR) {
                     j++;
                     dash++;
                 }
