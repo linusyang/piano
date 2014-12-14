@@ -6,5 +6,6 @@
 *.o
 *.mid
 *.output
+output.txt
 *.dSYM/
 piano

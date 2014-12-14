@@ -31,7 +31,7 @@ $(APP).tab.c: $(APP).y
 clean:
 	rm -f $(APP) *.o lex.yy.c lex.yy.cc 
 	rm -f $(APP).tab.c $(APP).tab.cc $(APP).tab.h $(APP).output
-	rm -f $(APP).mid
+	rm -f $(APP).mid output.txt
 	rm -Rf $(APP).dSYM
 
 .PHONY: all clean run

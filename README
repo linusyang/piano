@@ -1,15 +1,12 @@
 Piano
 =====
 
-A funny note translator.
+A funny music score translator.
 
-Run `make' to translate sample notes.
+Run `make' to translate sample songs.
 Translated notes can be played at http://virtualpiano.net/.
 
 Now it generates MIDI file!
-So no need to play by yourself. :)
-
-Oh, you may note that the grammar is buggy (has conflicts), 
-but at least it works :P
+So no need to play by yourself :)
 
 -- Love from Linus

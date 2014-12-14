@@ -6,6 +6,7 @@
 %{
 
 #include <iostream>
+#include <fstream>
 #include <cstdio>
 #include <vector>
 #include <string>
@@ -31,18 +32,14 @@ using namespace std;
 extern "C" char *yytext;
 extern "C" int yylex(YYSTYPE *, YYLTYPE *);
 extern "C" FILE *yyin;
-void yyerror(YYLTYPE *t, const char *s);
+void yyerror(YYLTYPE *, const char *);
 
-static string map_all(string &s, const char map[OCOUNT]);
-static string append_all(string &s, const char *t);
-static string remove_space(string &s);
-
-static char orig_key(char c);
-static string sharp_key(string &s);
-static string flat_key(string &s);
-static string sharp_all(string &s);
-static string flat_all(string &s);
-static void write_to_midi(string &s);
+static char map_octave(char c);
+static string *append_note(string *s, const char *t);
+static string *reduce_note(string *s);
+static string *sharp_note(string *s);
+static string *flat_note(string *s);
+static void output_note(string *s);
 
 static vector<string *> str_pool;
 static string *str_copy(string s);
@@ -122,38 +119,47 @@ const unsigned char midi_timeSigEvent[] = {
 %right TWOBEATS THREEBEATS FOURBEATS
 %left FLAT SHARP
 
-%type <sval> statments statment expression elements element
+%type <sval> notes note
 
 %start start
 
 %%
 
 start:
-    statments { cout << *($1); write_to_midi(*($1)); }
-    ;
-
-statments:
-    /* empty */ { $$ = PEMPTY; }
-    | statment statments
+    notes
     {
-        $$ = CONCAT($1, $2);
+        output_note($1);
     }
     ;
 
-statment:
-    VAR ASSIGN expression SEMICOLON
-    {
-        SETV($1, $3);
-        $$ = PEMPTY;
-    }
-    | expression
+notes:
+    note
     {
         $$ = $1;
     }
+    | note notes
+    {
+        if (($1)->length() > 0) {
+            $$ = (*($1) == newline) ? CONCAT(PNEWLINE, $2) : CONCAT_ELE($1, $2);
+        } else {
+            $$ = $2;
+        }
+    }
     ;
 
-expression:
-    INT LBRACE elements RBRACE
+note:
+    REF VAR { $$ = GETV($2); }
+    | NEWLINE { $$ = PNEWLINE; }
+    | OCTAVE { $$ = STR(map_octave($1)); }
+    | note TWOBEATS { $$ = append_note($1, "-"); }
+    | note THREEBEATS { $$ = append_note($1, "--"); }
+    | note FOURBEATS { $$ = append_note($1, "---"); }
+    | SHARP note { $$ = sharp_note($2); }
+    | FLAT note { $$ = flat_note($2); }
+    | LPAREN notes RPAREN { $$ = $2; }
+    | LBRACKET notes RBRACKET { $$ = reduce_note($2); }
+    | VAR ASSIGN notes SEMICOLON { SETV($1, $3); $$ = PEMPTY; }
+    | INT LBRACE notes RBRACE
     {
         string t;
         for (int i = 0; i < $1; i++) {
@@ -161,73 +167,11 @@ expression:
         }
         $$ = STR(t);
     }
-    | elements
-    {
-        $$ = $1;
-    }
-    ;
-
-elements:
-    element { $$ = $1; }
-    | element elements { $$ = (*($1) == newline) ? CONCAT(PNEWLINE, $2) : CONCAT_ELE($1, $2); }
-    ;
-
-element:
-    REF VAR { $$ = GETV($2); }
-    | NEWLINE { $$ = PNEWLINE; }
-    | OCTAVE { $$ = STR(orig_key($1)); }
-    | element TWOBEATS { $$ = STR(append_all(*($1), "-")); }
-    | element THREEBEATS { $$ = STR(append_all(*($1), "--")); }
-    | element FOURBEATS { $$ = STR(append_all(*($1), "---")); }
-    | SHARP element { $$ = STR(sharp_key(*($2))); }
-    | FLAT element { $$ = STR(flat_key(*($2))); }
-    | LPAREN elements RPAREN { $$ = $2; }
-    | LBRACKET elements RBRACKET { $$ = STR(remove_space(*($2))); }
     ;
 
 %%
 
-static char orig_key(char c)
-{
-    for (int i = 0; i < OCOUNT; i++) {
-        if (octaves[i] == c) {
-            return map_normal[i];
-        }
-    }
-    cerr << "ignore undefined octave: " << c << endl;
-    return -1;
-}
-
-static string change_key(string &s, bool flat)
-{
-    stringstream ss;
-    for (int i = 0; i < s.length(); i++) {
-        bool found = false;
-        if (s[i] != '-') {
-            for (int j = 0; j < OCOUNT; j++) {
-                if (map_normal[j] == s[i]) {
-                    ss << (flat ? map_flat[j] : map_sharp[j]);
-                    found = true;
-                    break;
-                }
-            }
-        }
-        if (!found) {
-            ss << s[i];
-        }
-    }
-    return ss.str();
-}
-
-static string sharp_key(string &s)
-{
-    return change_key(s, false);
-}
-
-static string flat_key(string &s)
-{
-    return change_key(s, true);
-}
+// String operations
 
 static vector<string> split(string s)
 {
@@ -247,42 +191,6 @@ static string merge(vector<string> &v)
         ss << v[i];
     }
     return ss.str();
-}
-
-static string sharp_all(string &s)
-{
-    vector<string> input, output;
-    input = split(s);
-    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
-        output.push_back(sharp_key(*i));
-    }
-    return merge(output);
-}
-
-static string flat_all(string &s)
-{
-    vector<string> input, output;
-    input = split(s);
-    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
-        output.push_back(flat_key(*i));
-    }
-    return merge(output);
-}
-
-static string append_all(string &s, const char *t)
-{
-    vector<string> input, output;
-    input = split(s);
-    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
-        output.push_back(*i + string(t));
-    }
-    return merge(output);
-}
-
-static string remove_space(string &str)
-{
-    str.erase(remove(str.begin(), str.end(), ' '), str.end());
-    return str;
 }
 
 static string *str_copy(string s)
@@ -321,6 +229,80 @@ static void str_pool_clean()
     str_pool.clear();
 }
 
+// Note transformation
+
+static char map_octave(char c)
+{
+    for (int i = 0; i < OCOUNT; i++) {
+        if (octaves[i] == c) {
+            return map_normal[i];
+        }
+    }
+    cerr << "** undefined octave: " << c << endl;
+    exit(-1);
+}
+
+static string transform_note(string &s, bool flat)
+{
+    stringstream ss;
+    for (int i = 0; i < s.length(); i++) {
+        bool found = false;
+        if (s[i] != '-') {
+            for (int j = 0; j < OCOUNT; j++) {
+                if (map_normal[j] == s[i]) {
+                    ss << (flat ? map_flat[j] : map_sharp[j]);
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            ss << s[i];
+        }
+    }
+    return ss.str();
+}
+
+static string *sharp_note(string *s)
+{
+    vector<string> input, output;
+    input = split(*s);
+    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
+        output.push_back(transform_note(*i, false));
+    }
+    string result(merge(output));
+    return STR(result);
+}
+
+static string *flat_note(string *s)
+{
+    vector<string> input, output;
+    input = split(*s);
+    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
+        output.push_back(transform_note(*i, true));
+    }
+    string result(merge(output));
+    return STR(result);
+}
+
+static string *append_note(string *s, const char *t)
+{
+    vector<string> input, output;
+    input = split(*s);
+    for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
+        output.push_back(*i + string(t));
+    }
+    string result(merge(output));
+    return STR(result);
+}
+
+static string *reduce_note(string *s)
+{
+    string str(*s);
+    str.erase(remove(str.begin(), str.end(), ' '), str.end());
+    return STR(str);
+}
+
 static int char_to_midi_note(char c)
 {
     for (int i = 0; i < OCOUNT; i++) {
@@ -336,10 +318,10 @@ static int char_to_midi_note(char c)
     return -1;
 }
 
-static void write_to_midi(string &s)
+static void output_note(string *s)
 {
     vector<pair<int, int> > seq;
-    vector<string> p = split(s);
+    vector<string> p = split(*s);
     int seq_size = sizeof(midi_tempoEvent) + 
         sizeof(midi_keySigEvent) + 
         sizeof(midi_timeSigEvent) + 
@@ -390,6 +372,14 @@ static void write_to_midi(string &s)
     }
     WRITE_BYTES(fout, midi_footer);
     fclose(fout);
+
+    std::ofstream pout("output.txt");
+    pout << *s;
+    pout.close();
+
+    cout << "** write to output.txt and piano.mid" << endl;
+    cout << "** translated notes:" << endl;
+    cout << *s;
 }
 
 void yyerror(YYLTYPE *t, const char *s)
@@ -407,7 +397,7 @@ int main(int argc, const char *argv[])
     }
     FILE *fin = fopen(fname, "r");
     if (!fin) {
-        cerr << "file not found: " << fname << endl;
+        cerr << "** file not found: " << fname << endl;
         return -1;
     }
 
