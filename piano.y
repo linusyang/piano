@@ -27,7 +27,6 @@
 #define PNEWLINE (&newline)
 #define WRITE_BYTES(f, b) (fwrite(b, 1, sizeof(b), f))
 #define BEAT_CHAR '-'
-#define BEAT_STR "-"
 
 using namespace std;
 
@@ -37,7 +36,7 @@ extern "C" FILE *yyin;
 void yyerror(const char *);
 
 static char map_octave(char c);
-static string *append_note(string *s, const char *t);
+static string *append_note(string *s);
 static string *reduce_note(string *s);
 static string *sharp_note(string *s);
 static string *flat_note(string *s);
@@ -149,7 +148,7 @@ note:
     REF VAR { $$ = GETV($2); }
     | NEWLINE { $$ = PNEWLINE; }
     | OCTAVE { $$ = STR(map_octave($1)); }
-    | note BEAT { $$ = append_note($1, BEAT_STR); }
+    | note BEAT { $$ = append_note($1); }
     | SHARP note { $$ = sharp_note($2); }
     | FLAT note { $$ = flat_note($2); }
     | LPAREN notes RPAREN { $$ = $2; }
@@ -259,6 +258,18 @@ static string transform_note(string &s, bool flat)
     return ss.str();
 }
 
+static string append_beat(string &s)
+{
+    stringstream ss;
+    for (int i = 0; i < s.length(); i++) {
+        ss << s[i];
+        if (s[i] != BEAT_CHAR) {
+            ss << BEAT_CHAR;
+        }
+    }
+    return ss.str();
+}
+
 static string *sharp_note(string *s)
 {
     vector<string> input, output;
@@ -281,12 +292,12 @@ static string *flat_note(string *s)
     return STR(result);
 }
 
-static string *append_note(string *s, const char *t)
+static string *append_note(string *s)
 {
     vector<string> input, output;
     input = split(*s);
     for (vector<string>::iterator i = input.begin(); i != input.end(); i++) {
-        output.push_back(*i + string(t));
+        output.push_back(append_beat(*i));
     }
     string result(merge(output));
     return STR(result);
